@@ -1,0 +1,63 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum bayType {
+  MALE
+  FEMALE
+}
+
+enum ticketStatus {
+  BLOCKED
+  PURCHASED
+  CANCELED
+}
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  user_id Int      @id @default(autoincrement())
+  email   String   @unique
+  gender  String?
+  name    String
+  Tickets Ticket[]
+}
+
+model Bay {
+  bay_id           Int      @id @default(autoincrement())
+  total_count      Int
+  available        Int
+  amount_of_ticket Float
+  bay_type         bayType
+  Tickets          Ticket[]
+}
+
+model Ticket {
+  ticket_id      Int      @id @default(autoincrement())
+  no_of_tickets  Int
+  ticket_status  ticketStatus
+  date           DateTime
+  user_id        Int
+  bay_id         Int
+  transaction_id Int?
+
+  User        User         @relation(fields: [user_id], references: [user_id])
+  Bay         Bay          @relation(fields: [bay_id], references: [bay_id])
+  Transaction Transaction? @relation(fields: [transaction_id], references: [transaction_id]) // Correct reference
+}
+
+model Transaction {
+  transaction_id         Int      @id @default(autoincrement())
+  transaction_status     String
+  transaction_amount     Float
+  transaction_identifier String
+  mode                   String
+  date                   DateTime
+
+  Tickets Ticket[]
+}
