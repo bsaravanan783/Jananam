@@ -5,9 +5,12 @@ const prisma = new PrismaClient();
 const createUser = async (userData) => {
   return await prisma.User.create({
     data: {
-      name: userData.username,
-      email: userData.email,
-      gender: userData.gender,
+      name: userData?.username,
+      email: userData?.email,
+      gender: userData?.gender  ,
+      contactNumber: userData?.contactNumber,
+      seating: userData?.seating,
+      transportNeed : userData?.transportNeed,
     },
   });
 };

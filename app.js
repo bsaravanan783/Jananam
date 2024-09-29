@@ -92,38 +92,28 @@ passport.deserializeUser(function (obj, done) {
 });
 
 // app.get("/login", passport.authenticate("azuread-openidconnect"));
-app.get("/login", cors(corsOptions), passport.authenticate("azuread-openidconnect"));
-
-// app.post("/login", (req, res, next) => {
-//   passport.authenticate("azuread-openidconnect", (err, user, info) => {
-//     if (err) {
-//       return res.status(500).json({ error: err });
-//     }
-//     if (!user) {
-//       return res.status(401).json({ message: "Authentication failed" });
-//     }
-//     req.login(user, (err) => {
-//       if (err) {
-//         return res.status(500).json({ error: err });
-//       }
-//       return res.status(200).json({ message: "Login successful", user });
-//     });
-//   })(req, res, next);
-// });
+app.get(
+  "/login",
+  cors(corsOptions),
+  passport.authenticate("azuread-openidconnect")
+);
 
 app.post(
   "/",
   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
   (req, res) => {
-    res.redirect("/");
+    res.redirect("http://localhost:3000/jananam");
+    // res.redirect("/");
 
-    console.log("kdmmlsl")
+    console.log("kdmmlsl");
   }
 );
 
 app.get("/", (req, res) => {
   if (req.isAuthenticated()) {
-    res.send(`Hello, ${req.user.displayName}!`);
+    res.redirect("http://localhost:3000/jananam");
+    console.log(`Hello, ${req.user.displayName}!`);
+    // res.send(`Hello, ${req.user.displayName}!`);
   } else {
     res.send("Please log in first.");
   }
@@ -145,7 +135,7 @@ app.post("/payment-success", async (req, res) => {
   const paymentData = req.body;
   console.log(paymentData);
   const result = await handlePaymentSuccess(paymentData);
-  res.redirect("http://localhost:8000/success");
+  res.redirect("http://localhost:3000/ticket");
   if (result.success) {
     res.status(200).json({
       message: "Payment processed successfully",
@@ -158,6 +148,12 @@ app.post("/payment-success", async (req, res) => {
   }
 });
 
+app.post("/failure", async (req, res) => {
+  console.log("helloe");
+  const data = req.body;
+  console.log(data);
+  res.json({ message: "Payment" });
+});
 app.get("/payment-failure", async (req, res) => {
   console.log("hi");
   res.redirect("http://localhost:3000/failure");
