@@ -14,18 +14,17 @@ enum ticketStatus {
   CANCELED
 }
 
-
-
 generator client {
   provider = "prisma-client-js"
 }
 
 model User {
-  user_id Int      @id @default(autoincrement())
-  email   String   @unique
+  user_id Int       @id @default(autoincrement())
+  email   String    @unique
   gender  String?
   name    String
   Tickets Ticket[]
+  Session Session[]
 }
 
 model Bay {
@@ -38,7 +37,7 @@ model Bay {
 }
 
 model Ticket {
-  ticket_id      Int      @id @default(autoincrement())
+  ticket_id      Int          @id @default(autoincrement())
   no_of_tickets  Int
   ticket_status  ticketStatus
   date           DateTime
@@ -60,4 +59,13 @@ model Transaction {
   date                   DateTime
 
   Tickets Ticket[]
+}
+
+model Session {
+  id          Int      @id @default(autoincrement())
+  sid         String   @unique
+  sess        Json?
+  expire      DateTime
+  User        User?    @relation(fields: [userUser_id], references: [user_id])
+  userUser_id Int?
 }

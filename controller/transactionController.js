@@ -1,6 +1,6 @@
 const transactionModel = require('../model/transactionModel');
 
-const createTransaction = async(){
+const createTransaction = async()=>{
     
     try {
     const transaction = await transactionModel.createTransaction();
@@ -13,3 +13,5 @@ const createTransaction = async(){
     }
 
 }
+
+module.exports = createTransaction;

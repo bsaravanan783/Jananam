@@ -1,4 +1,10 @@
 const express = require("express");
+const passport = require("passport");
+const { PrismaClient } = require("@prisma/client");
+const session = require("express-session");
+const OIDCStrategy = require("passport-azure-ad").OIDCStrategy;
+const PrismaStore = require("./prismaSessionStore");
+const connectPgSimple = require("connect-pg-simple");
 const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const cors = require("cors");
@@ -6,34 +12,66 @@ require("dotenv").config();
 const bayController = require("./controller/bayController");
 const bayModel = require("./model/bayModel");
 const bayRoutes = require("./routes/bayRoutes");
-const passport = require("passport");
-const session = require("express-session");
-const OIDCStrategy = require("passport-azure-ad").OIDCStrategy;
 
-const handlePaymentSuccess = require('./model/paymentController')
+const handlePaymentSuccess = require("./model/paymentController");
+
+require("dotenv").config();
+const corsOptions = {
+  origin: ["http://localhost:3000", "http://localhost:8000"],
+  credentials: true,
+};
 
 const app = express();
 const port = 8000;
+const prisma = new PrismaClient();
+const PgSession = connectPgSimple(session);
 
-// Middleware
+app.use(cors(corsOptions));
+app.use(express.json());
 app.use(bodyParser.json());
-app.use(cors());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(
-  session({ secret: process.env.SOCIAL_AUTH_AZUREAD_OAUTH2_SECRET, resave: false, saveUninitialized: true })
-);
+const sessionMiddleware = session({
+  store: new PgSession({
+    prisma: prisma,
+    tableName: "Session",
+  }),
+  secret: process.env.SOCIAL_AUTH_AZUREAD_OAUTH2_SECRET,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 24 * 60 * 60 * 1000 * 10,
+    priority: "high",
+    httpOnly: false,
+  },
+});
+
+app.use(sessionMiddleware);
+
+// Passport configuration
 app.use(passport.initialize());
 app.use(passport.session());
+// app.use(
+//   session({
+//     secret: process.env.SOCIAL_AUTH_AZUREAD_OAUTH2_SECRET,
+//     resave: false,
+//     saveUninitialized: false,
+//     store: new PrismaStore(prisma),
+//     cookie: { secure: false, maxAge: 24 * 60 * 60 * 1000 },
+//   })
+// );
+
 const tenant = process.env.SOCIAL_AUTH_AZUREAD_TENANT_OAUTH2_TENANT_ID;
+
 passport.use(
   new OIDCStrategy(
     {
       identityMetadata: `https://login.microsoftonline.com/${tenant}/v2.0/.well-known/openid-configuration`,
-      clientID: "Your Client ID",
-      clientSecret: "Your Client Secret",
+      clientID: process.env.SOCIAL_AUTH_AZUREAD_OAUTH2_KEY,
+      clientSecret: process.env.SOCIAL_AUTH_AZUREAD_OAUTH2_SECRET,
       responseType: "code",
       responseMode: "form_post",
-      redirectUrl: "http://localhost:3000/auth/callback",
+      redirectUrl: "http://localhost:8000/",
       allowHttpForRedirectUrl: true,
       passReqToCallback: false,
       scope: ["profile", "email", "openid"],
@@ -45,13 +83,6 @@ passport.use(
   )
 );
 
-app.get("/complete/azuread-oauth2/",(req, res) => {
-  passport.authenticate("azuread-openidconnect", {
-    successRedirect: "/",
-    failureRedirect: "/",
-  })(req, res);
-})
-
 passport.serializeUser(function (user, done) {
   done(null, user);
 });
@@ -60,32 +91,77 @@ passport.deserializeUser(function (obj, done) {
   done(null, obj);
 });
 
-app.use("/api", bayRoutes);
+// app.get("/login", passport.authenticate("azuread-openidconnect"));
+app.get("/login", cors(corsOptions), passport.authenticate("azuread-openidconnect"));
 
-app.post('/payment-success', async (req, res) => {
-  const paymentData = req.body; // Assuming this contains necessary data
-  console.log(paymentData);
-  const result = await handlePaymentSuccess(paymentData);
-  if (result.success) {
-      res.status(200).json({ message: "Payment processed successfully", transaction: result.transaction });
-  } else {
-      res.status(500).json({ message: "Error processing payment", error: result.error });
-  }
-});
-
-
-app.get(
-  "/login",
-  passport.authenticate("azuread-openidconnect", { failureRedirect: "/" })
-);
+// app.post("/login", (req, res, next) => {
+//   passport.authenticate("azuread-openidconnect", (err, user, info) => {
+//     if (err) {
+//       return res.status(500).json({ error: err });
+//     }
+//     if (!user) {
+//       return res.status(401).json({ message: "Authentication failed" });
+//     }
+//     req.login(user, (err) => {
+//       if (err) {
+//         return res.status(500).json({ error: err });
+//       }
+//       return res.status(200).json({ message: "Login successful", user });
+//     });
+//   })(req, res, next);
+// });
 
 app.post(
-  "/auth/callback",
+  "/",
   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
   (req, res) => {
     res.redirect("/");
+
+    console.log("kdmmlsl")
   }
 );
+
+app.get("/", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.send(`Hello, ${req.user.displayName}!`);
+  } else {
+    res.send("Please log in first.");
+  }
+});
+
+app.get("/logout", (req, res) => {
+  req.logout(() => {
+    res.redirect("/");
+  });
+});
+
+// seperate for payment
+
+//jskjfk
+
+app.use("/api", bayRoutes);
+
+app.post("/payment-success", async (req, res) => {
+  const paymentData = req.body;
+  console.log(paymentData);
+  const result = await handlePaymentSuccess(paymentData);
+  res.redirect("http://localhost:8000/success");
+  if (result.success) {
+    res.status(200).json({
+      message: "Payment processed successfully",
+      transaction: result.transaction,
+    });
+  } else {
+    res
+      .status(500)
+      .json({ message: "Error processing payment", error: result.error });
+  }
+});
+
+app.get("/payment-failure", async (req, res) => {
+  console.log("hi");
+  res.redirect("http://localhost:3000/failure");
+});
 
 app.get("/getBays", async (req, res) => {
   try {
@@ -119,7 +195,6 @@ app.post("/generate-hash", (req, res) => {
 
   const txnid = new Date().getTime().toString();
 
-  // Generate the hash using the provided data
   const hash = generatePayUHash({
     txnid,
     amount,
@@ -128,9 +203,8 @@ app.post("/generate-hash", (req, res) => {
     email,
   });
 
-  // Respond with the necessary fields for the frontend form submission
   res.json({
-    key: merchantKey, // Don't expose in frontend directly
+    key: merchantKey,
     txnid,
     hash,
     amount,
@@ -141,6 +215,7 @@ app.post("/generate-hash", (req, res) => {
 });
 
 app.post("/createBay", bayController.createbay);
+
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
