@@ -228,6 +228,62 @@ app.get("/getBays", async (req, res) => {
   }
 });
 
+const payyyyy = async()=>{
+  if (selectedBay && ticketCount > 0 && ticketCount <= 5) {
+    const totalAmount = selectedBay.amount_of_ticket * ticketCount;
+
+    const formData = {
+      amount: totalAmount,
+      productinfo: "Test Product",
+      firstname: "Anbarasan",
+      email: "ajithkumar161105@gmail.com",
+    };
+
+    try {
+      // const response = await axios.post(
+      //   "http://localhost:8000/generate-hash",
+      //   formData
+      // );
+      const response = generatePayUHash(formData);
+      const { hash, txnid } = response.data;
+
+      const payUForm = document.createElement("form");
+      payUForm.method = "POST";
+      payUForm.action = "https://test.payu.in/_payment";
+
+      const fields = {
+        key: "Hfr7dn",
+        txnid: txnid,
+        amount: totalAmount,
+        productinfo: formData.productinfo,
+        firstname: formData.firstname,
+        email: formData.email,
+        phone: "8056901611",
+        surl: "http://localhost:8000/payment-success",
+        furl: "http://localhost:8000/payment-failure",
+        hash: hash,
+        service_provider: "payu_paisa",
+      };
+
+      Object.keys(fields).forEach((key) => {
+        const input = document.createElement("input");
+        input.type = "hidden";
+        input.name = key;
+        input.value = fields[key];
+        payUForm.appendChild(input);
+      });
+
+      document.body.appendChild(payUForm);
+      payUForm.submit();
+    } catch (error) {
+      console.error("Error generating hash:", error);
+      alert("Error generating hash");
+    }
+  } else {
+    alert("Please select a valid number of tickets (1-5).");
+  }
+}
+
 const merchantKey = process.env.PAYU_MERCHANT_KEY;
 const merchantSalt = process.env.PAYU_MERCHANT_SALT;
 
@@ -236,6 +292,78 @@ const generatePayUHash = (formData) => {
   const hashString = `${merchantKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${merchantSalt}`;
   return crypto.createHash("sha512").update(hashString).digest("hex");
 };
+
+
+
+
+
+
+app.post("/payment", (req, res) => {
+  const { selectedBay, ticketCount } = req.body;
+
+  if (!selectedBay || ticketCount <= 0 || ticketCount > 5) {
+    return res.status(400).json({ error: "Invalid ticket count or bay selection." });
+  }
+
+  const totalAmount = selectedBay.amount_of_ticket * ticketCount;
+  const txnid = new Date().getTime().toString(); // Unique transaction ID
+
+  const hash = generatePayUHash({
+    txnid,
+    amount: totalAmount,
+    productinfo: "Test Product",
+    firstname: "Anbarasan",
+    email: "ajithkumar161105@gmail.com",
+  });
+
+  // Instead of creating a form on the frontend, respond with the payment data
+  res.json({
+    key: merchantKey,
+    txnid,
+    hash,
+    amount: totalAmount,
+    productinfo: "Test Product",
+    firstname: "Anbarasan",
+    email: "ajithkumar161105@gmail.com",
+    phone: "8056901611",
+    surl: "http://localhost:8000/payment-success",
+    furl: "http://localhost:8000/payment-failure",
+  });
+});
+
+// Route to serve the payment form
+app.post("/initiate-payment", (req, res) => {
+  const { paymentData } = req.body;
+
+  const payUForm = `
+    <form method="POST" action="https://test.payu.in/_payment">
+      <input type="hidden" name="key" value="${paymentData.key}">
+      <input type="hidden" name="txnid" value="${paymentData.txnid}">
+      <input type="hidden" name="amount" value="${paymentData.amount}">
+      <input type="hidden" name="productinfo" value="${paymentData.productinfo}">
+      <input type="hidden" name="firstname" value="${paymentData.firstname}">
+      <input type="hidden" name="email" value="${paymentData.email}">
+      <input type="hidden" name="phone" value="${paymentData.phone}">
+      <input type="hidden" name="surl" value="${paymentData.surl}">
+      <input type="hidden" name="furl" value="${paymentData.furl}">
+      <input type="hidden" name="hash" value="${paymentData.hash}">
+      <input type="hidden" name="service_provider" value="payu_paisa">
+    </form>
+    <script>
+      document.forms[0].submit();
+    </script>
+  `;
+
+  res.send(payUForm); // Send the form back to the client
+});
+
+
+
+
+
+
+
+
 
 app.post("/generate-hash", (req, res) => {
   const { amount, productinfo, firstname, email } = req.body;
@@ -270,3 +398,6 @@ app.post("/createBay", bayController.createbay);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
+
+
+
