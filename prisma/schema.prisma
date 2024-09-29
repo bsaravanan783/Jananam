@@ -20,12 +20,13 @@ enum gender {
 }
 
 enum seating {
-  seating
+  SEATING
 }
 
-enum tranport {
-  NEEDED
-  NOTNEEDED
+enum transactionStatus {
+  COMPLETED
+  PROCESSED
+  CANCELED
 }
 
 generator client {
@@ -37,9 +38,9 @@ model User {
   email         String   @unique
   gender        gender
   name          String
-  contactNumber Int
+  contactNumber String
   seating       seating
-  transportNeed tranport
+  transportNeed Boolean
   Tickets       Ticket[]
 }
 
@@ -54,7 +55,6 @@ model Bay {
 
 model Ticket {
   ticket_id      Int          @id @default(autoincrement())
-  no_of_tickets  Int
   ticket_status  ticketStatus
   date           DateTime
   user_id        Int
@@ -67,8 +67,8 @@ model Ticket {
 }
 
 model Transaction {
-  transaction_id         Int      @id @default(autoincrement())
-  transaction_status     String
+  transaction_id         Int               @id @default(autoincrement())
+  transaction_status     transactionStatus
   transaction_amount     Float
   transaction_identifier String
   mode                   String

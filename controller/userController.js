@@ -1,12 +1,24 @@
 const userModel = require("../model/userModel");
-const createuser = async (req, res) => {
+
+const createUser = async (req, res) => {
   try {
-    const userData = req.body;
-    const newUser = await userModel.createUser(userData);
-    return res.status(200).json(newUser);
+    if (req.isAuthenticated() && req.session.user) {
+      const name = req.session.user._json.name;
+      const email = req.session.user._json.email;
+      const userData = { ...req.body, name, email };
+
+      console.log("User Data for Ticket Creation:", userData);
+
+      const newUser = await userModel.createUser(userData);
+      console.log(newUser);
+      return res.status(200).json(newUser);
+    } else {
+      res.status(401).json({ message: "Unauthorized" });
+    }
   } catch (error) {
+    console.error("Error in createuser:", error);
     return res.status(500).json({
-      error: "Error occurred in creating a user",
+      error: "Error occurred in creating a user or ticket",
       details: error.message,
     });
   }
@@ -56,5 +68,4 @@ const findUserByEmail = async (req, res) => {
   }
 };
 
-
-export {createuser,findUserByEmail,getAllUSers,getUserById};
+module.exports = { createUser, findUserByEmail, getAllUSers, getUserById };

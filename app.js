@@ -5,30 +5,31 @@ const session = require("express-session");
 const OIDCStrategy = require("passport-azure-ad").OIDCStrategy;
 const PrismaStore = require("./prismaSessionStore");
 const connectPgSimple = require("connect-pg-simple");
-const bodyParser = require("body-parser");
 const crypto = require("crypto");
 const cors = require("cors");
 require("dotenv").config();
 const bayController = require("./controller/bayController");
 const bayModel = require("./model/bayModel");
 const bayRoutes = require("./routes/bayRoutes");
+const cookieParser = require("cookie-parser");
+const userController = require("./controller/userController");
 
 const handlePaymentSuccess = require("./model/paymentController");
 
 require("dotenv").config();
-const corsOptions = {
-  origin: ["http://localhost:3000", "http://localhost:8000"],
-  credentials: true,
-};
 
 const app = express();
 const port = 8000;
 const prisma = new PrismaClient();
 const PgSession = connectPgSimple(session);
+const corsOptions = {
+  origin: ["http://localhost:3000", "http://localhost:8000"],
+  credentials: true,
+};
 
 app.use(cors(corsOptions));
+app.use(cookieParser());
 app.use(express.json());
-app.use(bodyParser.json());
 app.use(express.urlencoded({ extended: true }));
 
 const sessionMiddleware = session({
@@ -98,16 +99,70 @@ app.get(
   passport.authenticate("azuread-openidconnect")
 );
 
+// app.post(
+//   "/",
+//   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
+//   (req, res) => {
+//     if (!req.session) {
+//       return res.status(500).json({ error: "Session not initialized" });
+//     }
+
+//     req.session.user = req.user;
+
+//     req.session.save((err) => {
+//       if (err) {
+//         console.error("Error saving session:", err);
+//         return res.status(500).json({ error: "Internal Server Error" });
+//       }
+//       console.log("Session saved:", req.session);
+//       res.redirect("http://localhost:3000/jananam");
+//     });
+//   }
+// );
+
 app.post(
   "/",
   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
   (req, res) => {
-    res.redirect("http://localhost:3000/jananam");
-    // res.redirect("/");
+    if (!req.session) {
+      return res.status(500).json({ error: "Session not initialized" });
+    }
 
-    console.log("kdmmlsl");
+    req.session.user = req.user;
+    req.session.save((err) => {
+      if (err) {
+        console.error("Error saving session:", err);
+        return res.status(500).json({ error: "Internal Server Error" });
+      }
+      console.log("Session saved:", req.session);
+      res.redirect("http://localhost:3000/jananam");
+    });
   }
 );
+
+app.post("/createTicket", userController.createUser);
+
+// app.post("/createTicket", (req, res) => {
+//   if (req.isAuthenticated() && req.session.user) {
+//     console.log(req.body);
+//     console.log(req.session.user._json);
+//     const name = req.session.user._json.name;
+//     const email = req.session.user._json.email;
+//   } else {
+//     res.status(401).json({ message: "Unauthorized" });
+//   }
+// });
+
+// app.post(
+//   "/",
+//   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
+//   (req, res) => {
+//     res.redirect("http://localhost:3000/jananam");
+//     // res.redirect("/");
+
+//     console.log("kdmmlsl");
+//   }
+// );
 
 app.get("/", (req, res) => {
   if (req.isAuthenticated()) {
