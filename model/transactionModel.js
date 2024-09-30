@@ -16,4 +16,4 @@ const createTransaction = async () => {
   return transaction;
 };
 
-module.export = { createTransaction };
+module.exports = { createTransaction };

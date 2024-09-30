@@ -13,6 +13,7 @@ const bayModel = require("./model/bayModel");
 const bayRoutes = require("./routes/bayRoutes");
 const cookieParser = require("cookie-parser");
 const userController = require("./controller/userController");
+const ticketModel = require("./model/ticketModel");
 
 const handlePaymentSuccess = require("./model/paymentController");
 
@@ -186,20 +187,42 @@ app.get("/logout", (req, res) => {
 
 app.use("/api", bayRoutes);
 
+app.get("/check", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ user: req.user });
+  } else {
+    res.json({ error: "Not authenticated" });
+  }
+});
 app.post("/payment-success", async (req, res) => {
   const paymentData = req.body;
-  console.log(paymentData);
+  console.log("Payment Data:", paymentData);
+  // res.redirect("http://localhost:3000/ticket");
+
   const result = await handlePaymentSuccess(paymentData);
-  res.redirect("http://localhost:3000/ticket");
+
   if (result.success) {
-    res.status(200).json({
-      message: "Payment processed successfully",
-      transaction: result.transaction,
-    });
+    res.redirect("http://localhost:3000/ticket");
   } else {
     res
       .status(500)
       .json({ message: "Error processing payment", error: result.error });
+  }
+});
+
+app.post("/payment-failure", async (req, res) => {
+  const paymentData = req.body;
+  const result = await handlePaymentFailure(paymentData);
+
+  if (result.success) {
+    res.redirect("http://localhost:3000/failure");
+  } else {
+    res
+      .status(500)
+      .json({
+        message: "Error processing payment failure",
+        error: result.error,
+      });
   }
 });
 
@@ -208,10 +231,6 @@ app.post("/failure", async (req, res) => {
   const data = req.body;
   console.log(data);
   res.json({ message: "Payment" });
-});
-app.get("/payment-failure", async (req, res) => {
-  console.log("hi");
-  res.redirect("http://localhost:3000/failure");
 });
 
 app.get("/getBays", async (req, res) => {
@@ -228,87 +247,39 @@ app.get("/getBays", async (req, res) => {
   }
 });
 
-const payyyyy = async()=>{
-  if (selectedBay && ticketCount > 0 && ticketCount <= 5) {
-    const totalAmount = selectedBay.amount_of_ticket * ticketCount;
-
-    const formData = {
-      amount: totalAmount,
-      productinfo: "Test Product",
-      firstname: "Anbarasan",
-      email: "ajithkumar161105@gmail.com",
-    };
-
-    try {
-      // const response = await axios.post(
-      //   "http://localhost:8000/generate-hash",
-      //   formData
-      // );
-      const response = generatePayUHash(formData);
-      const { hash, txnid } = response.data;
-
-      const payUForm = document.createElement("form");
-      payUForm.method = "POST";
-      payUForm.action = "https://test.payu.in/_payment";
-
-      const fields = {
-        key: "Hfr7dn",
-        txnid: txnid,
-        amount: totalAmount,
-        productinfo: formData.productinfo,
-        firstname: formData.firstname,
-        email: formData.email,
-        phone: "8056901611",
-        surl: "http://localhost:8000/payment-success",
-        furl: "http://localhost:8000/payment-failure",
-        hash: hash,
-        service_provider: "payu_paisa",
-      };
-
-      Object.keys(fields).forEach((key) => {
-        const input = document.createElement("input");
-        input.type = "hidden";
-        input.name = key;
-        input.value = fields[key];
-        payUForm.appendChild(input);
-      });
-
-      document.body.appendChild(payUForm);
-      payUForm.submit();
-    } catch (error) {
-      console.error("Error generating hash:", error);
-      alert("Error generating hash");
-    }
-  } else {
-    alert("Please select a valid number of tickets (1-5).");
-  }
-}
-
 const merchantKey = process.env.PAYU_MERCHANT_KEY;
 const merchantSalt = process.env.PAYU_MERCHANT_SALT;
 
-const generatePayUHash = (formData) => {
-  const { txnid, amount, productinfo, firstname, email } = formData;
-  const hashString = `${merchantKey}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${merchantSalt}`;
-  return crypto.createHash("sha512").update(hashString).digest("hex");
-};
+function sha512(str) {
+  return crypto.createHash("sha512").update(str).digest("hex");
+}
 
+function generatePayUHash(params) {
+  const salt = process.env.PAYU_MERCHANT_SALT;
+  let hashString = `${params.key}|${params.txnid}|${params.amount}|${params.productinfo}|${params.firstname}|${params.email}|||||||||||${salt}`;
+  return sha512(hashString);
+}
 
+app.post("/payment", async (req, res) => {
 
-
-
-
-app.post("/payment", (req, res) => {
+  console.log(req,"jkadks")
   const { selectedBay, ticketCount } = req.body;
 
   if (!selectedBay || ticketCount <= 0 || ticketCount > 5) {
-    return res.status(400).json({ error: "Invalid ticket count or bay selection." });
+    return res
+      .status(400)
+      .json({ error: "Invalid ticket count or bay selection." });
   }
 
+  const ticketStatus = "BLOCKED";
+  const userId = "1"; 
+  const ticketCreationResult = await ticketModel.createTicket(userId,selectedBay.bay_type,ticketStatus);
+  console.log(ticketCreationResult);
   const totalAmount = selectedBay.amount_of_ticket * ticketCount;
-  const txnid = new Date().getTime().toString(); // Unique transaction ID
+  const txnid = new Date().getTime().toString();
 
   const hash = generatePayUHash({
+    key: process.env.PAYU_MERCHANT_KEY,
     txnid,
     amount: totalAmount,
     productinfo: "Test Product",
@@ -316,9 +287,8 @@ app.post("/payment", (req, res) => {
     email: "ajithkumar161105@gmail.com",
   });
 
-  // Instead of creating a form on the frontend, respond with the payment data
-  res.json({
-    key: merchantKey,
+  const paymentData = {
+    key: process.env.PAYU_MERCHANT_KEY,
     txnid,
     hash,
     amount: totalAmount,
@@ -328,42 +298,34 @@ app.post("/payment", (req, res) => {
     phone: "8056901611",
     surl: "http://localhost:8000/payment-success",
     furl: "http://localhost:8000/payment-failure",
-  });
+  };
+
+  res.json(paymentData);
 });
 
-// Route to serve the payment form
 app.post("/initiate-payment", (req, res) => {
   const { paymentData } = req.body;
 
   const payUForm = `
     <form method="POST" action="https://test.payu.in/_payment">
-      <input type="hidden" name="key" value="${paymentData.key}">
-      <input type="hidden" name="txnid" value="${paymentData.txnid}">
-      <input type="hidden" name="amount" value="${paymentData.amount}">
-      <input type="hidden" name="productinfo" value="${paymentData.productinfo}">
-      <input type="hidden" name="firstname" value="${paymentData.firstname}">
-      <input type="hidden" name="email" value="${paymentData.email}">
-      <input type="hidden" name="phone" value="${paymentData.phone}">
-      <input type="hidden" name="surl" value="${paymentData.surl}">
-      <input type="hidden" name="furl" value="${paymentData.furl}">
-      <input type="hidden" name="hash" value="${paymentData.hash}">
-      <input type="hidden" name="service_provider" value="payu_paisa">
+        <input type="hidden" name="key" value="${paymentData.key}">
+        <input type="hidden" name="txnid" value="${paymentData.txnid}">
+        <input type="hidden" name="amount" value="${paymentData.amount}">
+        <input type="hidden" name="productinfo" value="${paymentData.productinfo}">
+        <input type="hidden" name="firstname" value="${paymentData.firstname}">
+        <input type="hidden" name="email" value="${paymentData.email}">
+        <input type="hidden" name="phone" value="${paymentData.phone}">
+        <input type="hidden" name="surl" value="${paymentData.surl}">
+        <input type="hidden" name="furl" value="${paymentData.furl}">
+        <input type="hidden" name="hash" value="${paymentData.hash}">
     </form>
     <script>
-      document.forms[0].submit();
+        document.forms[0].submit();
     </script>
   `;
 
-  res.send(payUForm); // Send the form back to the client
+  res.send(payUForm);
 });
-
-
-
-
-
-
-
-
 
 app.post("/generate-hash", (req, res) => {
   const { amount, productinfo, firstname, email } = req.body;
@@ -398,6 +360,3 @@ app.post("/createBay", bayController.createbay);
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
 });
-
-
-
