@@ -14,8 +14,8 @@ const bayRoutes = require("./routes/bayRoutes");
 const cookieParser = require("cookie-parser");
 const userController = require("./controller/userController");
 const ticketModel = require("./model/ticketModel");
-
-const handlePaymentSuccess = require("./model/paymentController");
+const userModel = require("./model/userModel");
+const paymentController = require("./model/paymentController");
 
 require("dotenv").config();
 
@@ -100,27 +100,6 @@ app.get(
   passport.authenticate("azuread-openidconnect")
 );
 
-// app.post(
-//   "/",
-//   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
-//   (req, res) => {
-//     if (!req.session) {
-//       return res.status(500).json({ error: "Session not initialized" });
-//     }
-
-//     req.session.user = req.user;
-
-//     req.session.save((err) => {
-//       if (err) {
-//         console.error("Error saving session:", err);
-//         return res.status(500).json({ error: "Internal Server Error" });
-//       }
-//       console.log("Session saved:", req.session);
-//       res.redirect("http://localhost:3000/jananam");
-//     });
-//   }
-// );
-
 app.post(
   "/",
   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
@@ -165,8 +144,22 @@ app.post("/createTicket", userController.createUser);
 //   }
 // );
 
-app.get("/", (req, res) => {
+app.get("/", async (req, res) => {
   if (req.isAuthenticated()) {
+    if (req?.user) {
+      const userData = req.user._json;
+      const userExistence = await userModel.findUserByEmail(
+        req.user._json.email
+      );
+      if (!userExistence) {
+        const response = await userModel.createUser(userData);
+        console.log(response);
+      }
+      // }
+      // const response = await userModel.createUser(userData);
+      // console.log(response);
+    }
+
     res.redirect("http://localhost:3000/jananam");
     console.log(`Hello, ${req.user.displayName}!`);
     // res.send(`Hello, ${req.user.displayName}!`);
@@ -199,7 +192,7 @@ app.post("/payment-success", async (req, res) => {
   console.log("Payment Data:", paymentData);
   // res.redirect("http://localhost:3000/ticket");
 
-  const result = await handlePaymentSuccess(paymentData);
+  const result = await paymentController.handlePaymentSuccess(paymentData);
 
   if (result.success) {
     res.redirect("http://localhost:3000/ticket");
@@ -217,12 +210,10 @@ app.post("/payment-failure", async (req, res) => {
   if (result.success) {
     res.redirect("http://localhost:3000/failure");
   } else {
-    res
-      .status(500)
-      .json({
-        message: "Error processing payment failure",
-        error: result.error,
-      });
+    res.status(500).json({
+      message: "Error processing payment failure",
+      error: result.error,
+    });
   }
 });
 
@@ -249,7 +240,9 @@ app.get("/getBays", async (req, res) => {
 
 const merchantKey = process.env.PAYU_MERCHANT_KEY;
 const merchantSalt = process.env.PAYU_MERCHANT_SALT;
-
+app.post("/createTicket", async (req, res) => {
+  const data = await req.body;
+});
 function sha512(str) {
   return crypto.createHash("sha512").update(str).digest("hex");
 }
@@ -261,21 +254,19 @@ function generatePayUHash(params) {
 }
 
 app.post("/payment", async (req, res) => {
-
-  console.log(req,"jkadks")
-  const { selectedBay, ticketCount } = req.body;
-
-  if (!selectedBay || ticketCount <= 0 || ticketCount > 5) {
-    return res
-      .status(400)
-      .json({ error: "Invalid ticket count or bay selection." });
+  console.log(req.body);
+  const userDataToUpdate = req.body;
+  console.log(req.user._json);
+  const userEmail = req.user._json.email;
+  console.log(typeof userEmail);
+  const user = await userModel.findUserByEmail(userEmail);
+  if (!user) {
+    return res.status(400).json({ message: "User not found" });
   }
+  const updatedUser = await userModel.updateUser(user, userDataToUpdate);
 
-  const ticketStatus = "BLOCKED";
-  const userId = "1"; 
-  const ticketCreationResult = await ticketModel.createTicket(userId,selectedBay.bay_type,ticketStatus);
-  console.log(ticketCreationResult);
-  const totalAmount = selectedBay.amount_of_ticket * ticketCount;
+  const ticketAmount = 1500;
+  const totalAmount = ticketAmount;
   const txnid = new Date().getTime().toString();
 
   const hash = generatePayUHash({
@@ -284,7 +275,7 @@ app.post("/payment", async (req, res) => {
     amount: totalAmount,
     productinfo: "Test Product",
     firstname: "Anbarasan",
-    email: "ajithkumar161105@gmail.com",
+    email: "saravanan.22me@kct.ac.in",
   });
 
   const paymentData = {
@@ -294,18 +285,18 @@ app.post("/payment", async (req, res) => {
     amount: totalAmount,
     productinfo: "Test Product",
     firstname: "Anbarasan",
-    email: "ajithkumar161105@gmail.com",
+    email: "saravanan.22me@kct.ac.in",
     phone: "8056901611",
     surl: "http://localhost:8000/payment-success",
     furl: "http://localhost:8000/payment-failure",
   };
 
+  console.log(paymentData, "fsjndfjgfdnfmdfkndljgdnlkgmflk");
   res.json(paymentData);
 });
 
 app.post("/initiate-payment", (req, res) => {
   const { paymentData } = req.body;
-
   const payUForm = `
     <form method="POST" action="https://test.payu.in/_payment">
         <input type="hidden" name="key" value="${paymentData.key}">
@@ -355,7 +346,11 @@ app.post("/generate-hash", (req, res) => {
   });
 });
 
-app.post("/createBay", bayController.createbay);
+app.post("/createBay", (req, res) => {
+  const data = req.body;
+  console.log(data);
+  bayModel.createBay(data);
+});
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);

@@ -34,14 +34,15 @@ generator client {
 }
 
 model User {
-  user_id       Int      @id @default(autoincrement())
-  email         String   @unique
+  user_id       Int           @id @default(autoincrement())
+  email         String        @unique
   gender        gender
   name          String
   contactNumber String
   seating       seating
   transportNeed Boolean
   Tickets       Ticket[]
+  Transaction   Transaction[]
 }
 
 model Bay {
@@ -59,7 +60,7 @@ model Ticket {
   date           DateTime
   user_id        Int
   bay_id         Int
-  transaction_id Int?
+  transaction_id Int
 
   User        User         @relation(fields: [user_id], references: [user_id])
   Bay         Bay          @relation(fields: [bay_id], references: [bay_id])
@@ -73,8 +74,9 @@ model Transaction {
   transaction_identifier String
   mode                   String
   date                   DateTime
-
-  Tickets Ticket[]
+  user                   User              @relation(fields: [userId], references: [user_id])
+  userId                 Int
+  Tickets                Ticket[]
 }
 
 model Session {

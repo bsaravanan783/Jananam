@@ -1,10 +1,11 @@
 const { createTransaction } = require("./transactionModel");
 const { createTicket, updateTicketStatus } = require("./ticketModel");
 const { getIndividualBayById, updateBayAvailability } = require("./bayModel");
-const { getUserById,findUserByEmail } = require("./userModel");
+const { getUserById, findUserByEmail } = require("./userModel");
 
-const handlePaymentSuccess = async ( paymentData) => {
+const handlePaymentSuccess = async (paymentData) => {
   try {
+    console.log(JSON.stringify(paymentData));
     const { mihpayid, txnid, amount, firstname, email, phone, status } =
       paymentData;
 
@@ -13,21 +14,23 @@ const handlePaymentSuccess = async ( paymentData) => {
     }
 
     const userId = await findUserByEmail(email);
-     const ticketCount =1
-     const bayId =1
+    console.log(email, "snfjnjnjlsnfjfnjfngjfndgjndjfgnfjnjdfn");
+    const ticketCount = 1;
+    const bayId = " 1";
 
-    const transaction = await createTransaction({
-      userId,
+    const data = {
+      userId: userId.user_id,
       amount,
       transactionId: txnid,
-      status: "SUCCESS",
+      status: "COMPLETED",
       mihpayid,
-    });
+    };
 
-    for (let i = 0; i < ticketCount; i++) {
-      const ticket = await createTicket({ userId, bayId, status: "PURCHASED" });
-      await updateTicketStatus(ticket.id, "PURCHASED");
-    }
+    const transaction = await createTransaction(data);
+    console.log(data, "transaction")
+
+    const ticket = await createTicket( userId.user_id, bayId,"PURCHASED" );
+    await updateTicketStatus(ticket.id, "PURCHASED");
 
     const user = await getUserById(userId);
     console.log(user);
@@ -45,35 +48,32 @@ const handlePaymentSuccess = async ( paymentData) => {
 };
 
 const handlePaymentFailure = async (paymentData) => {
-    try {
-        const { mihpayid, txnid, amount, firstname, email, phone, status } = paymentData;
+  try {
+    const { mihpayid, txnid, amount, firstname, email, phone, status } =
+      paymentData;
 
-        console.log("Payment failed:", paymentData);
+    console.log("Payment failed:", paymentData);
 
-        const user = await findUserByEmail(email);
-        if (!user) {
-            throw new Error("User not found.");
-        }
-
-        await createTransaction({
-            userId: user.user_id,
-            amount,
-            transactionId: txnid,
-            status: "FAILURE",
-            mihpayid,
-        });
-
-
-        return { success: true };
-    } catch (error) {
-        console.error("Error handling payment failure:", error);
-        return { success: false, error: error.message };
+    const user = await findUserByEmail(email);
+    if (!user) {
+      throw new Error("User not found.");
     }
+
+    await createTransaction({
+      userId: user.user_id,
+      amount,
+      transactionId: txnid,
+      status: "FAILURE",
+      mihpayid,
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Error handling payment failure:", error);
+    return { success: false, error: error.message };
+  }
 };
 
-
-
-
-// const handlePaymentFailure = 
+// const handlePaymentFailure =
 
 module.exports = { handlePaymentSuccess, handlePaymentFailure };
