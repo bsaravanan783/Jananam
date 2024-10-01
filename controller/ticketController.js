@@ -34,4 +34,7 @@ const updateTicketStatus = async (req, res) => {
     }
 };
 
-module.exports = { createTicket, updateTicketStatus };
+
+
+
+module.exports = { createTicket, updateTicketStatus, };

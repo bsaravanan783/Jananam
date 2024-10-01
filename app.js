@@ -16,7 +16,7 @@ const userController = require("./controller/userController");
 const ticketModel = require("./model/ticketModel");
 const userModel = require("./model/userModel");
 const paymentController = require("./model/paymentController");
-
+const transactionModel = require("./model/transactionModel");
 require("dotenv").config();
 
 const app = express();
@@ -100,6 +100,15 @@ app.get(
   passport.authenticate("azuread-openidconnect")
 );
 
+app.get("/getUserDetails", (req, res) => {
+  if (req.isAuthenticated() && req.session.user) {
+    console.log(req.session.user);
+    return res.status(200).json(req.session.user);
+  } else {
+    return res.status(401).json({ error: "User not authenticated" });
+  }
+});
+
 app.post(
   "/",
   passport.authenticate("azuread-openidconnect", { failureRedirect: "/" }),
@@ -121,6 +130,22 @@ app.post(
 );
 
 app.post("/createTicket", userController.createUser);
+
+app.post("/getUser", async (req, res) => {
+  try {
+    console.log(req.body.email);
+    const email = req.body.email;
+
+    const userDetails = await userModel.getUserDetailsByEmail(email);
+
+    return res.status(200).json(userDetails);
+  } catch (error) {
+    return res.status(500).json({
+      error: "Error occurred in fetching user details",
+      details: error.message,
+    });
+  }
+});
 
 // app.post("/createTicket", (req, res) => {
 //   if (req.isAuthenticated() && req.session.user) {
@@ -164,7 +189,7 @@ app.get("/", async (req, res) => {
     console.log(`Hello, ${req.user.displayName}!`);
     // res.send(`Hello, ${req.user.displayName}!`);
   } else {
-    res.send("Please log in first.");
+    res.redirect("http://localhost:3000/");
   }
 });
 
@@ -191,6 +216,7 @@ app.get("/check", (req, res) => {
 });
 app.post("/payment-success", async (req, res) => {
   const paymentData = req.body;
+
   console.log("Payment Data:", paymentData);
   // res.redirect("http://localhost:3000/ticket");
 
@@ -209,7 +235,7 @@ app.post("/payment-success", async (req, res) => {
 
 app.post("/payment-failure", async (req, res) => {
   const paymentData = req.body;
-  const result = await handlePaymentFailure(paymentData);
+  const result = await paymentController.handlePaymentFailure(paymentData);
 
   if (result.success) {
     res.redirect("http://localhost:3000/failure");
@@ -257,9 +283,56 @@ function generatePayUHash(params) {
   return sha512(hashString);
 }
 
+app.post("/Message", async (req, res) => {
+  const auth = {
+    username: process.env.MessageSendusername,
+    password: process.env.MessageSendpassword,
+  };
+  const { email, message } = req.body;
+
+  const messageData = {
+    email: email,
+    message: message,
+    contentType: "html",
+  };
+
+  try {
+    const response = await axios.post(
+      "http://10.1.76.75:20000/send/",
+      messageData,
+      { auth }
+    );
+
+    if (response.status === 200) {
+      return res
+        .status(200)
+        .json({ success: true, message: "email sent successfully!" });
+    } else {
+      return res
+        .status(response.status)
+        .json({ success: false, message: "Failed to send email" });
+    }
+  } catch (error) {
+    console.error("Error forwarding email:", error);
+    return res
+      .status(500)
+      .json({
+        success: false,
+        message: "Error sending email. Please try again.",
+      });
+  }
+});
+
 app.post("/payment", async (req, res) => {
-  console.log(req.body);
+  console.log(req.body, "yuyyyyyyyyyyyyyyyyyyyyyyyyyyy");
   const userDataToUpdate = req.body;
+  const bayReq = await bayModel.getBayIdByAmountAndGender(
+    userDataToUpdate.amount,
+    userDataToUpdate.gender
+  );
+
+  console.log(bayReq, "qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
+
   console.log(req.user._json);
   const userEmail = req.user._json.email;
   console.log(typeof userEmail);
@@ -268,8 +341,28 @@ app.post("/payment", async (req, res) => {
     return res.status(400).json({ message: "User not found" });
   }
   const updatedUser = await userModel.updateUser(user, userDataToUpdate);
+  console.log(updatedUser, "updated user");
+  // const transactionResult = await transactionModel.createTransaction()
 
-  const ticketAmount = 1500;
+  const utcNow = new Date();
+
+  const istOffset = 5.5 * 60 * 60 * 1000; // 5 hours and 30 minutes in milliseconds
+  let paymentDate = new Date(utcNow.getTime() + istOffset);
+
+  const octoberStart = new Date("2024-10-01T00:00:00Z"); // October 1, 2024, 00:00:00 UTC
+  const octoberEnd = new Date("2024-10-03T23:59:59Z"); // October 3, 2024, 23:59:59 UTC
+
+  let ticketAmount = userDataToUpdate.amount;
+
+  if (paymentDate >= octoberStart && paymentDate <= octoberEnd) {
+    ticketAmount = ticketAmount - 50;
+  }
+
+  console.log("Payment Date (IST):", paymentDate);
+  console.log("Ticket Amount:", ticketAmount);
+
+  console.log(ticketAmount, "early bird price");
+
   const totalAmount = ticketAmount;
   const txnid = new Date().getTime().toString();
 
@@ -295,12 +388,29 @@ app.post("/payment", async (req, res) => {
     furl: "http://localhost:8000/payment-failure",
   };
 
-  console.log(paymentData, "fsjndfjgfdnfmdfkndljgdnlkgmflk");
   res.json(paymentData);
 });
 
-app.post("/initiate-payment", (req, res) => {
+app.post("/initiate-payment", async (req, res) => {
   const { paymentData } = req.body;
+
+  console.log(paymentData, "wwwwwwwwwwwwwwwwwwwwwwwwww");
+  const user = await userModel.findUserByEmail(paymentData.email);
+  const txnId = req.body.paymentData.txnid;
+  const amount = req.body.paymentData.amount;
+  const transactionStatus = "PROCESSED";
+  const userId = user.user_id;
+
+  const data = {
+    txnId,
+    amount,
+    transactionStatus,
+    userId,
+  };
+  const transactionResponse = await transactionModel.createTransaction(data);
+
+  console.log(transactionResponse, "Transaction created");
+
   const payUForm = `
     <form method="POST" action="https://test.payu.in/_payment">
         <input type="hidden" name="key" value="${paymentData.key}">

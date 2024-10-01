@@ -6,14 +6,14 @@ const createTransaction = async (data) => {
   try {
     const transaction = await prisma.transaction.create({
       data: {
-        transaction_status: data.status,               
-        transaction_amount: parseFloat(data.amount),               
-        transaction_identifier: data.transactionId,   
-        mode: data.mode || "ONLINE",                   
-        date: new Date(),                             
+        transaction_status: data.transactionStatus,
+        transaction_amount: parseFloat(data.amount),
+        transaction_id: data.txnId,
+        mode: data.mode || "ONLINE",
+        date: new Date(),
         user: {
           connect: {
-              user_id: data.userId,                          
+            user_id: data.userId,
           },
         },
       },
@@ -27,5 +27,34 @@ const createTransaction = async (data) => {
   }
 };
 
+const updateTransaction = async (txnid, status) => {
+  try {
+    const updatedTransaction = await prisma.transaction.update({
+      where: {
+        transaction_id: txnid,
+      },
+      data: {
+        transaction_status: status,
+      },
+    });
+    return updatedTransaction;
+  } catch (error) {
+    console.error("Error updating transaction:", error);
+    throw new Error("Failed to complete(update) transaction");
+  }
+};
 
-module.exports = { createTransaction };
+const getTransactionByTxnId = async (txnId) => {
+  const transaction = await prisma.transaction.findFirst({
+    where: {
+      transaction_id: txnId,
+    },
+  });
+  return transaction;
+};
+
+module.exports = {
+  createTransaction,
+  getTransactionByTxnId,
+  updateTransaction,
+};

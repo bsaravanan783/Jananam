@@ -3,10 +3,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// enum bayType {
+//   MALE_1
+//   MALE_2
+//   FEMALE_1
+//   FEMALE_2
+// }
 enum bayType {
   MALE
   FEMALE
 }
+
 
 enum ticketStatus {
   BLOCKED
@@ -41,6 +48,8 @@ model User {
   contactNumber String
   seating       seating
   transportNeed Boolean
+  bay_id        Int?
+  Bay           Bay?          @relation(fields: [bay_id], references: [bay_id])
   Tickets       Ticket[]
   Transaction   Transaction[]
 }
@@ -50,8 +59,9 @@ model Bay {
   total_count      Int
   available        Int
   amount_of_ticket Float
-  bay_type         bayType
+  bay_name         bayType
   Tickets          Ticket[]
+  User             User[]
 }
 
 model Ticket {
@@ -60,7 +70,7 @@ model Ticket {
   date           DateTime
   user_id        Int
   bay_id         Int
-  transaction_id Int
+  transaction_id String
 
   User        User         @relation(fields: [user_id], references: [user_id])
   Bay         Bay          @relation(fields: [bay_id], references: [bay_id])
@@ -68,15 +78,14 @@ model Ticket {
 }
 
 model Transaction {
-  transaction_id         Int               @id @default(autoincrement())
-  transaction_status     transactionStatus
-  transaction_amount     Float
-  transaction_identifier String
-  mode                   String
-  date                   DateTime
-  user                   User              @relation(fields: [userId], references: [user_id])
-  userId                 Int
-  Tickets                Ticket[]
+  transaction_id     String            @id
+  transaction_status transactionStatus
+  transaction_amount Float
+  mode               String
+  date               DateTime
+  user               User              @relation(fields: [userId], references: [user_id])
+  userId             Int
+  Tickets            Ticket[]
 }
 
 model Session {

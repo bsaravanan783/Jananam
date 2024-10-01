@@ -10,6 +10,7 @@ const createBay = async (data) => {
       available: data.available,
       amount_of_ticket: data.amount_of_ticket,
       bay_type: data.bay_type,
+      bay_name: data.bay_name,
     },
   });
   console.log(bay);
@@ -22,7 +23,33 @@ const getAllBay = async () => {
   return bay;
 };
 
-const updateBayAvailability = async (bayId, newAvailableCount) => {
+const getBayIdByAmountAndGender = async (amount, gender) => {
+  const bay = await prisma.bay.findFirst({
+    where: {
+      amount_of_ticket: amount,
+      bay_name: gender === "MALE" ? { in: ["MALE"] } : { in: ["FEMALE"] }, // Use enum values
+    },
+  });
+
+  if (bay) {
+    return bay.bay_id;
+  } else {
+    throw new Error("Bay not found for the given amount and gender");
+  }
+};
+
+const getBayIdByGender = async (gender) => {
+
+  const bay = await prisma.bay.findMany({
+    where: {
+      gender: gender,
+    },
+  });
+};
+
+const updateBayAvailability = async (bayId, availableCount) => {
+  const newAvailableCount = availableCount - 1;
+
   if (newAvailableCount < 0) {
     throw new Error("New available count cannot be negative");
   }
@@ -62,4 +89,5 @@ module.exports = {
   getIndividualBayById,
   getBayByType,
   updateBayAvailability,
+  getBayIdByAmountAndGender,
 };

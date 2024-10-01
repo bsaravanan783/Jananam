@@ -99,4 +99,21 @@ const findUserByEmail = async (email) => {
   return user;
 };
 
-module.exports = { createUser, findUserByEmail, getUserById, getAllUsers ,updateUser};
+const getUserDetailsByEmail = async (email) => {
+  const userDetails = await prisma.user.findUnique({
+    where: {
+      email: email,
+    },
+    include: {
+      Tickets: true, // Include the related tickets
+    },
+  });
+
+  if (!userDetails) {
+    throw new Error("User not found");
+  }
+
+  return userDetails;
+};
+
+module.exports = { createUser, findUserByEmail, getUserById, getAllUsers ,updateUser,getUserDetailsByEmail};

@@ -68,4 +68,20 @@ const findUserByEmail = async (req, res) => {
   }
 };
 
-module.exports = { createUser, findUserByEmail, getAllUSers, getUserById };
+const getUserDetailsByEmail = async (req, res) => {
+  try {
+    console.log(req.body.email);
+      const { email } = req.body; 
+
+      const userDetails = await ticketModel.getUserDetailsByEmail(email); 
+
+      return res.status(200).json(userDetails); 
+  } catch (error) {
+      return res.status(500).json({
+          error: "Error occurred in fetching user details",
+          details: error.message,
+      });
+  }
+};
+
+module.exports = { createUser, findUserByEmail, getAllUSers, getUserById,getUserDetailsByEmail };
