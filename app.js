@@ -116,8 +116,24 @@ app.post(
     if (!req.session) {
       return res.status(500).json({ error: "Session not initialized" });
     }
+    
+    // attempt here
+    const userProfile = req.user._json;
+    const userEmail = userProfile.email || userProfile.preferred_username; // Fallback to preferred_username\
+    console.log(userEmail,"useremail rceived");
+    if (!userEmail) {
+      return res.status(400).json({ error: "No email or username provided" });
+    }
 
-    req.session.user = req.user;
+    req.session.user = {
+      ...userProfile,
+      email: userEmail, 
+    };
+
+    
+
+
+    // req.session.user = req.user;
     req.session.save((err) => {
       if (err) {
         console.error("Error saving session:", err);
@@ -172,13 +188,20 @@ app.post("/getUser", async (req, res) => {
 app.get("/", async (req, res) => {
   if (req.isAuthenticated()) {
     if (req?.user) {
+      console.log(
+        "userExistence    bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+      );
+
       const userData = req.user._json;
       const userExistence = await userModel.findUserByEmail(
         req.user._json.email
       );
       if (!userExistence) {
+        console.log(
+          "userExistence    aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        );
         const response = await userModel.createUser(userData);
-        console.log(response);
+        console.log(response, "response from create user");
       }
       // }
       // const response = await userModel.createUser(userData);
@@ -310,12 +333,10 @@ app.post("/Message", async (req, res) => {
     }
   } catch (error) {
     console.error("Error forwarding email:", error);
-    return res
-      .status(500)
-      .json({
-        success: false,
-        message: "Error sending email. Please try again.",
-      });
+    return res.status(500).json({
+      success: false,
+      message: "Error sending email. Please try again.",
+    });
   }
 });
 
@@ -331,6 +352,7 @@ app.post("/payment", async (req, res) => {
 
   console.log(req.user._json);
   const userEmail = req.user._json.email;
+  const userName = req.user._json.username;
   console.log(typeof userEmail);
   const user = await userModel.findUserByEmail(userEmail);
   if (!user) {
@@ -367,8 +389,9 @@ app.post("/payment", async (req, res) => {
     txnid,
     amount: totalAmount,
     productinfo: "Test Product",
-    firstname: "Anbarasan",
-    email: "saravanan.22me@kct.ac.in",
+    firstname: userName,
+    email: userEmail,
+    // email: "mogesh.22au@kct.ac.in",
   });
 
   const paymentData = {
@@ -377,20 +400,22 @@ app.post("/payment", async (req, res) => {
     hash,
     amount: totalAmount,
     productinfo: "Test Product",
-    firstname: "Anbarasan",
-    email: "saravanan.22me@kct.ac.in",
-    phone: "8056901611",
+    firstname: userName,
+    email: userEmail,
+    // email: "mogesh.22au@kct.ac.in",
+
+    phone: userDataToUpdate.contactNumber,
     surl: "http://localhost:8000/payment-success",
     furl: "http://localhost:8000/payment-failure",
   };
 
+  console.log(paymentData, "mkdmfkdmfmmmmmmmmmmmm");
   res.json(paymentData);
 });
 
 app.post("/initiate-payment", async (req, res) => {
   const { paymentData } = req.body;
-
-  console.log(paymentData, "wwwwwwwwwwwwwwwwwwwwwwwwww");
+  console.log(paymentData, "wwwwwwwwwwwwwwwwwwwwllllll");
   const user = await userModel.findUserByEmail(paymentData.email);
   const txnId = req.body.paymentData.txnid;
   const amount = req.body.paymentData.amount;
