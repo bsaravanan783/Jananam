@@ -2,45 +2,62 @@ const { createTransaction } = require("./transactionModel");
 const { createTicket, updateTicketStatus } = require("./ticketModel");
 const { getIndividualBayById, updateBayAvailability } = require("./bayModel");
 const { getUserById, findUserByEmail } = require("./userModel");
+const transactionModel = require("./transactionModel");
+
+const ticketModel = require("./ticketModel");
 
 const handlePaymentSuccess = async (paymentData) => {
   try {
-    console.log(JSON.stringify(paymentData));
+    // console.log(JSON.stringify(paymentData));
+
+    console.log(paymentData, "LLLLLLLLLLLLLLLLLLLLLLLLLLLLLLLL");
     const { mihpayid, txnid, amount, firstname, email, phone, status } =
       paymentData;
 
-    if (status !== "success") {
-      throw new Error("Payment was not successful.");
+    if (status === "success") {
+      const transactionStatus = "COMPLETED";
+      const updatedTransaction = await transactionModel.updateTransaction(
+        txnid,
+        transactionStatus
+      );
+      console.log(updatedTransaction, "transaction updated to success ");
     }
 
-    const userId = await findUserByEmail(email);
+    const user = await findUserByEmail(email);
     console.log(email, "snfjnjnjlsnfjfnjfngjfndgjndjfgnfjnjdfn");
     const ticketCount = 1;
-    const bayId = " 1";
+    const bayId = 1;
 
     const data = {
-      userId: userId.user_id,
+      userId: user.user_id,
       amount,
-      transactionId: txnid,
-      status: "COMPLETED",
+      txnId: txnid,
+      ticketStatus: "PURCHASED",
+      bayId,
       mihpayid,
     };
 
-    const transaction = await createTransaction(data);
-    console.log(data, "transaction")
+    const ticket = await ticketModel.createTicket(data);
 
-    const ticket = await createTicket( userId.user_id, bayId,"PURCHASED" );
-    await updateTicketStatus(ticket.id, "PURCHASED");
-
-    const user = await getUserById(userId);
-    console.log(user);
+    console.log(ticket, "created ticket");
+    // const user = await getUserById(userId);
+    // console.log(user);
 
     const bay = await getIndividualBayById(bayId);
-    if (bay) {
-      await updateBayAvailability(bayId, bay.available - ticketCount);
-    }
+    console.log(bay, "bbbbbbbbbbbbbbbbbbbbbbbbbbb:");
 
-    return { success: true, transaction };
+    const updateBayAvailabeSeatCount = await updateBayAvailability(
+      bayId,
+      bay.available
+    );
+
+    console.log(updateBayAvailabeSeatCount, `new availability of bay ${bayId}`);
+
+    // if (bay) {
+    //   await updateBayAvailability(bayId, bay.available - ticketCount);
+    // }
+
+    return { success: true };
   } catch (error) {
     console.error("Error handling payment success:", error);
     return { success: false, error: error.message };
@@ -58,14 +75,16 @@ const handlePaymentFailure = async (paymentData) => {
     if (!user) {
       throw new Error("User not found.");
     }
+    if (status == "failure") {
+      const transactionStatus = "CANCELED";
+      const updatedTransactionForFailure =
+        await transactionModel.updateTransaction(txnid, transactionStatus);
 
-    await createTransaction({
-      userId: user.user_id,
-      amount,
-      transactionId: txnid,
-      status: "FAILURE",
-      mihpayid,
-    });
+      console.log(
+        updatedTransactionForFailure,
+        "transaction updated to failure "
+      );
+    }
 
     return { success: true };
   } catch (error) {

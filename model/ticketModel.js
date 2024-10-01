@@ -2,32 +2,33 @@ const { PrismaClient } = require("@prisma/client");
 const { getUserById, findUserByEmail } = require("./userModel");
 const prisma = new PrismaClient();
 
-const createTicket = async (userId, bayType, ticketStatus) => {
+const createTicket = async (data) => {
   console.log(
-    "ticket status: " + ticketStatus,
-    "userId: " + userId,
-    "bayType: " + bayType
+    "ticket status: " + data.ticketStatus,
+    "userId: " + data.userId,
+    "bayType: " + data.bayType
   );
-
-  const user = await getUserById(parseInt(userId));
+  const mihpayid = data.mihpayid;
+  const user = await getUserById(parseInt(data.userId));
   if (!user) {
     throw new Error("User not found");
   }
 
   const ticket = await prisma.ticket.create({
     data: {
-      ticket_status: ticketStatus,
+      ticket_status: data.ticketStatus,
       date: new Date(),
-      user_id: user.user_id, 
-      bay_id: bayType, 
+      //   user_id: data.userId,
+      //   bay_id: data.bayId,
+      //   transaction_id: data.txnId,
       User: {
-        connect: { user_id: user.user_id }, 
+        connect: { user_id: data.userId },
       },
       Bay: {
-        connect: { bay_id: bayType },
+        connect: { bay_id: data.bayId },
       },
       Transaction: {
-        connect: { transaction_id: txnId },
+        connect: { transaction_id: data.txnId },
       },
     },
   });
@@ -49,4 +50,6 @@ const updateTicketStatus = async (ticketId, status) => {
   return updatedTicket;
 };
 
-module.exports = { createTicket, updateTicketStatus };
+
+
+module.exports = { createTicket, updateTicketStatus,  };
