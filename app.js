@@ -236,6 +236,8 @@ app.get("/session-status", (req, res) => {
 
 app.get("/check", (req, res) => {
   if (req.isAuthenticated()) {
+    console.log(req.isAuthenticated)
+    console.log( req.user)
     res.json({ user: req.user });
   } else {
     res.json({ error: "Not authenticated" });
@@ -248,6 +250,8 @@ app.post("/payment-success", async (req, res) => {
   // res.redirect("http://localhost:3000/ticket");
 
   const result = await paymentController.handlePaymentSuccess(paymentData);
+  console.log(result)
+  console.log(result.error)
 
   if (result.success) {
     res.redirect("http://localhost:3000/ticket");
