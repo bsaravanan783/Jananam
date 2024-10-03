@@ -116,22 +116,19 @@ app.post(
     if (!req.session) {
       return res.status(500).json({ error: "Session not initialized" });
     }
-    
+
     // attempt here
     const userProfile = req.user._json;
     const userEmail = userProfile.email || userProfile.preferred_username; // Fallback to preferred_username\
-    console.log(userEmail,"useremail rceived");
+    console.log(userEmail, "useremail rceived");
     if (!userEmail) {
       return res.status(400).json({ error: "No email or username provided" });
     }
 
     req.session.user = {
       ...userProfile,
-      email: userEmail, 
+      email: userEmail,
     };
-
-    
-
 
     // req.session.user = req.user;
     req.session.save((err) => {
@@ -212,6 +209,7 @@ app.get("/", async (req, res) => {
     console.log(`Hello, ${req.user.displayName}!`);
     // res.send(`Hello, ${req.user.displayName}!`);
   } else {
+
     res.redirect("http://localhost:3000/");
   }
 });
@@ -227,6 +225,14 @@ app.get("/logout", (req, res) => {
 //jskjfk
 
 app.use("/api", bayRoutes);
+
+app.get("/session-status", (req, res) => {
+  if (req.isAuthenticated()) {
+    res.json({ isLoggedIn: true });
+  } else {
+    res.json({ error: "Not authenticated" });
+  }
+});
 
 app.get("/check", (req, res) => {
   if (req.isAuthenticated()) {
@@ -486,6 +492,28 @@ app.post("/createBay", (req, res) => {
   console.log(data);
   bayModel.createBay(data);
 });
+
+
+
+
+setInterval(async() => {
+  // const apiCall = await fetch("sssss",{
+  //   method: 'GET',
+  //   headers: {
+  //     'Content-Type': 'application/json',
+  //   },
+
+  //   credentials: "include",
+  // })
+
+  // if(success){
+  //   const handleTransactionUpdate = await transactionModel.updateTransaction(txnid,status);
+  //   console.log(handleTransactionUpdate,"transaction Changes";)
+  // }
+
+  console.log('hi');
+}, 5000);
+
 
 app.listen(port, () => {
   console.log(`Server is running on port ${port}`);
